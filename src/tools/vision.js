@@ -226,7 +226,7 @@ export function registerMethods(mcp) {
       const nodeCanvasWebgl = await import('node-canvas-webgl/lib/index.js')
       const createCanvas = nodeCanvasWebgl.default?.createCanvas || nodeCanvasWebgl.createCanvas
       const prismarineViewer = await import('prismarine-viewer')
-      const { WorldView, Viewer } = prismarineViewer.viewer
+      const { WorldView, Viewer } = prismarineViewer.default.viewer
 
       // Create canvas and renderer
       const canvas = createCanvas(width, height)
