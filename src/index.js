@@ -9,6 +9,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import mineflayer from 'mineflayer'
 import minecraftData from 'minecraft-data'
 import pathfinderPkg from 'mineflayer-pathfinder'
@@ -82,8 +83,8 @@ class MinecraftMCP {
       { capabilities: { tools: {} } }
     )
 
-    this.server.setRequestHandler('tools/list', () => this.listTools())
-    this.server.setRequestHandler('tools/call', (req) => this.callTool(req))
+    this.server.setRequestHandler(ListToolsRequestSchema, () => this.listTools())
+    this.server.setRequestHandler(CallToolRequestSchema, (req) => this.callTool(req))
 
     // Register all tool handlers from modules
     for (const module of toolModules) {
