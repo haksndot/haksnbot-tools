@@ -185,7 +185,7 @@ export function registerMethods(mcp) {
     try {
       // Start virtual display if not already running
       if (!this.xvfb) {
-        const Xvfb = require('xvfb')
+        const { default: Xvfb } = await import('xvfb')
         this.xvfb = new Xvfb({ silent: true })
         this.xvfb.startSync()
       }
@@ -212,17 +212,21 @@ export function registerMethods(mcp) {
 
       // Load THREE.js - needs window to exist
       if (!global.THREE) {
-        global.THREE = require('three')
+        const THREE = await import('three')
+        global.THREE = THREE
       }
 
       // Set up Worker for meshing threads
       if (!global.Worker) {
-        global.Worker = require('worker_threads').Worker
+        const { Worker } = await import('worker_threads')
+        global.Worker = Worker
       }
 
       // Load prismarine-viewer module
-      const { createCanvas } = require('node-canvas-webgl/lib')
-      const { WorldView, Viewer } = require('prismarine-viewer').viewer
+      const nodeCanvasWebgl = await import('node-canvas-webgl/lib/index.js')
+      const createCanvas = nodeCanvasWebgl.default?.createCanvas || nodeCanvasWebgl.createCanvas
+      const prismarineViewer = await import('prismarine-viewer')
+      const { WorldView, Viewer } = prismarineViewer.viewer
 
       // Create canvas and renderer
       const canvas = createCanvas(width, height)
