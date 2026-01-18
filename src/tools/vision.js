@@ -378,6 +378,16 @@ export function registerMethods(mcp) {
       // Cleanup renderer
       renderer.dispose()
 
+      // Save screenshot to disk
+      const screenshotDir = path.join(process.cwd(), '..', 'state', 'screenshots')
+      if (!fs.existsSync(screenshotDir)) {
+        fs.mkdirSync(screenshotDir, { recursive: true })
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const filename = `screenshot-${timestamp}.png`
+      const filepath = path.join(screenshotDir, filename)
+      fs.writeFileSync(filepath, pngBuffer)
+
       // Return image with debug info
       return {
         content: [
@@ -390,6 +400,7 @@ export function registerMethods(mcp) {
               width,
               height,
               view_distance,
+              saved_to: filepath,
               debug: debugInfo
             }, null, 2)
           },
