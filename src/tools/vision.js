@@ -17,7 +17,7 @@ export const tools = [
       properties: {
         width: { type: 'number', description: 'Image width in pixels (default 512)', default: 512 },
         height: { type: 'number', description: 'Image height in pixels (default 512)', default: 512 },
-        view_distance: { type: 'number', description: 'View distance in chunks (default 6)', default: 6 }
+        view_distance: { type: 'number', description: 'View distance in chunks (default 32)', default: 32 }
       }
     }
   },
