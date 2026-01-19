@@ -179,7 +179,7 @@ export function registerMethods(mcp) {
     return { content }
   }
 
-  mcp.takeScreenshot = async function({ width = 512, height = 512, view_distance = 6 }) {
+  mcp.takeScreenshot = async function({ width, height, view_distance }) {
     this.requireBot()
 
     try {
