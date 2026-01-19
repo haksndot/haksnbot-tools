@@ -177,9 +177,9 @@ Environment:
   MC_AUTH_CACHE              Token cache directory (default: ~/.minecraft/nmp-cache)
 
 Examples:
-  node auth.js login haksnbot@hotmail.com
-  node auth.js status haksnbot@hotmail.com
-  node auth.js export haksnbot@hotmail.com tokens.json
+  node auth.js login your-email@outlook.com
+  node auth.js status your-email@outlook.com
+  node auth.js export your-email@outlook.com tokens.json
   scp tokens.json server:~/
   ssh server "node auth.js import tokens.json"
 `)
