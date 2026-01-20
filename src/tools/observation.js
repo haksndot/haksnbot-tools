@@ -25,14 +25,14 @@ export const tools = [
   },
   {
     name: 'scan_area',
-    description: 'Scan blocks in a cubic area, returns block counts by type',
+    description: 'Scan visible blocks in a cubic area, returns block counts by type. Only sees blocks visible from bot position (no x-ray).',
     inputSchema: {
       type: 'object',
       properties: {
         x: { type: 'number', description: 'Center X' },
         y: { type: 'number', description: 'Center Y' },
         z: { type: 'number', description: 'Center Z' },
-        radius: { type: 'number', description: 'Scan radius (default 5)', default: 5 }
+        radius: { type: 'number', description: 'Scan radius (default 16)', default: 16 }
       },
       required: ['x', 'y', 'z']
     }
@@ -122,29 +122,94 @@ export function registerMethods(mcp, Vec3) {
     return json(result)
   }
 
-  mcp.scanArea = function({ x, y, z, radius = 5 }) {
+  mcp.scanArea = function({ x, y, z, radius = 16 }) {
     this.requireBot()
     const blocks = {}
-    const center = new Vec3(x, y, z)
 
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dz = -radius; dz <= radius; dz++) {
-          const block = this.bot.blockAt(center.offset(dx, dy, dz))
-          if (block && block.name !== 'air') {
-            // Include block state properties in key for meaningful states
-            const properties = block.getProperties()
-            let key = block.name
-            if (properties && Object.keys(properties).length > 0) {
-              // Format: blockname[prop1=val1,prop2=val2]
-              const propsStr = Object.entries(properties)
-                .map(([k, v]) => `${k}=${v}`)
-                .join(',')
-              key = `${block.name}[${propsStr}]`
+    // Helper to get block key with properties
+    const getBlockKey = (block) => {
+      const properties = block.getProperties()
+      let key = block.name
+      if (properties && Object.keys(properties).length > 0) {
+        const propsStr = Object.entries(properties)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(',')
+        key = `${block.name}[${propsStr}]`
+      }
+      return key
+    }
+
+    // Helper to check if block is transparent (can see/move through)
+    const isTransparent = (block) => {
+      if (!block) return true
+      if (block.name === 'air' || block.name === 'cave_air' || block.name === 'void_air') return true
+      // Use mineflayer's transparent property if available
+      if (block.transparent) return true
+      return false
+    }
+
+    // Flood-fill visibility from bot position
+    // Only returns blocks that are visible (adjacent to reachable air)
+    const botPos = this.bot.entity.position.floored()
+    const visited = new Set()
+    const visibleBlockPositions = new Set()
+    const queue = [botPos]
+
+    // Define scan boundaries (cubic area around center)
+    const minX = x - radius, maxX = x + radius
+    const minY = y - radius, maxY = y + radius
+    const minZ = z - radius, maxZ = z + radius
+
+    // BFS flood-fill through transparent blocks
+    while (queue.length > 0) {
+      const pos = queue.shift()
+      const key = `${pos.x},${pos.y},${pos.z}`
+
+      if (visited.has(key)) continue
+      visited.add(key)
+
+      const block = this.bot.blockAt(pos)
+
+      if (isTransparent(block)) {
+        // This is a transparent block - explore neighbors
+        const offsets = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]]
+        for (const [ox, oy, oz] of offsets) {
+          const neighborPos = pos.offset(ox, oy, oz)
+          const neighborKey = `${neighborPos.x},${neighborPos.y},${neighborPos.z}`
+
+          if (visited.has(neighborKey)) continue
+
+          const neighborBlock = this.bot.blockAt(neighborPos)
+
+          if (isTransparent(neighborBlock)) {
+            // Continue flood-fill through transparent blocks
+            // But only queue if within extended bounds (allow some exploration outside scan area)
+            const extendedRadius = radius + 10 // Allow pathfinding from nearby
+            if (Math.abs(neighborPos.x - x) <= extendedRadius &&
+                Math.abs(neighborPos.y - y) <= extendedRadius &&
+                Math.abs(neighborPos.z - z) <= extendedRadius) {
+              queue.push(neighborPos)
             }
-            blocks[key] = (blocks[key] || 0) + 1
+          } else if (neighborBlock) {
+            // Solid block adjacent to transparent - it's visible!
+            // Only record if within the actual scan area
+            if (neighborPos.x >= minX && neighborPos.x <= maxX &&
+                neighborPos.y >= minY && neighborPos.y <= maxY &&
+                neighborPos.z >= minZ && neighborPos.z <= maxZ) {
+              visibleBlockPositions.add(neighborKey)
+            }
           }
         }
+      }
+    }
+
+    // Count the visible blocks
+    for (const posKey of visibleBlockPositions) {
+      const [bx, by, bz] = posKey.split(',').map(Number)
+      const block = this.bot.blockAt(new Vec3(bx, by, bz))
+      if (block && block.name !== 'air' && block.name !== 'cave_air' && block.name !== 'void_air') {
+        const key = getBlockKey(block)
+        blocks[key] = (blocks[key] || 0) + 1
       }
     }
 
