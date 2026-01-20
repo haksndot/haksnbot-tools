@@ -4,10 +4,15 @@
 
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+// Get absolute path to repo root (minecraft-mcp is a sibling of agent)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 
 // Bot message log file - the agent tails this for real-time notifications
 const BOT_MESSAGE_LOG = process.env.BOT_MESSAGE_LOG ||
-  path.join(process.cwd(), 'agent', 'data', 'bot-messages.log')
+  path.join(REPO_ROOT, 'agent', 'data', 'bot-messages.log')
 
 // Ensure log directory exists
 try {
