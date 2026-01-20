@@ -2,7 +2,7 @@
  * Connection tools - connect, disconnect, get_connection_status
  */
 
-import { text, json } from '../utils/helpers.js'
+import { text, json, logBotMessage } from '../utils/helpers.js'
 
 export const tools = [
   {
@@ -135,14 +135,39 @@ export function registerMethods(mcp, mineflayer, minecraftData, pathfinder) {
       this.bot.on('chat', (user, message) => {
         this.chatLog.push({ type: 'chat', user, message, timestamp: Date.now() })
         if (this.chatLog.length > 100) this.chatLog.shift()
+        // Log to file for agent to tail
+        logBotMessage('chat', message, { user })
       })
 
       this.bot.on('message', (jsonMsg, position) => {
         if (position === 'system' || position === 'game_info') {
           const msgText = jsonMsg.toString()
           if (!msgText.trim()) return
+
+          // FreedomChat rewrites player chat as system messages
+          // EssentialsXChat formats as "Username: message"
+          // Try to parse player chat from system messages
+          const chatMatch = msgText.match(/^([A-Za-z0-9_]{3,16}): (.+)$/)
+          if (chatMatch && position === 'system') {
+            const [, user, message] = chatMatch
+            // Don't duplicate if we already got this via the chat event
+            const isDuplicate = this.chatLog.some(m =>
+              m.type === 'chat' && m.user === user && m.message === message &&
+              Date.now() - m.timestamp < 1000
+            )
+            if (!isDuplicate) {
+              this.chatLog.push({ type: 'chat', user, message, timestamp: Date.now() })
+              if (this.chatLog.length > 100) this.chatLog.shift()
+              // Log to file for agent to tail
+              logBotMessage('chat', message, { user })
+              return
+            }
+          }
+
           this.chatLog.push({ type: 'system', message: msgText, position, timestamp: Date.now() })
           if (this.chatLog.length > 100) this.chatLog.shift()
+          // Log system messages to file for agent to tail (command responses, etc.)
+          logBotMessage('system', msgText, { position })
         }
       })
 

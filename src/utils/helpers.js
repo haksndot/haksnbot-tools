@@ -2,6 +2,34 @@
  * Helper utilities for MCP responses and common operations
  */
 
+import fs from 'fs'
+import path from 'path'
+
+// Bot message log file - the agent tails this for real-time notifications
+const BOT_MESSAGE_LOG = process.env.BOT_MESSAGE_LOG ||
+  path.join(process.cwd(), 'agent', 'data', 'bot-messages.log')
+
+// Ensure log directory exists
+try {
+  fs.mkdirSync(path.dirname(BOT_MESSAGE_LOG), { recursive: true })
+} catch (e) {
+  // Ignore if already exists
+}
+
+/**
+ * Log a message received by the bot to the message log file.
+ * The agent tails this file to get real-time notifications of bot messages.
+ */
+export function logBotMessage(type, content, extra = {}) {
+  const timestamp = new Date().toISOString()
+  const logLine = JSON.stringify({ timestamp, type, content, ...extra }) + '\n'
+  try {
+    fs.appendFileSync(BOT_MESSAGE_LOG, logLine)
+  } catch (e) {
+    console.error('Failed to write bot message log:', e.message)
+  }
+}
+
 // Helper for consistent text responses
 export function text(msg) {
   return { content: [{ type: 'text', text: msg }] }
