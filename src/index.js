@@ -152,10 +152,13 @@ class MinecraftMCP {
     await this.server.connect(transport)
     console.error('Minecraft MCP server running')
 
-    // Auto-connect if environment variables are set
+    // Auto-connect if environment variables are set (unless deferred)
     const host = process.env.MC_HOST
     const username = process.env.MC_USERNAME
-    if (host && username) {
+    const deferConnect = process.env.MC_DEFER_CONNECT === '1'
+    const triggerFile = process.env.MC_CONNECT_TRIGGER // File path to watch for deferred connect
+
+    if (host && username && !deferConnect) {
       console.error(`Auto-connecting to ${host} as ${username}...`)
       try {
         await this.connect({
@@ -169,6 +172,60 @@ class MinecraftMCP {
       } catch (err) {
         console.error(`Auto-connect failed: ${err.message}`)
       }
+    } else if (deferConnect && triggerFile) {
+      // Watch for trigger file - Python will create it when ready
+      const fs = require('fs')
+      const path = require('path')
+      const triggerDir = path.dirname(triggerFile)
+      const triggerName = path.basename(triggerFile)
+
+      // Ensure the directory exists
+      if (!fs.existsSync(triggerDir)) {
+        fs.mkdirSync(triggerDir, { recursive: true })
+      }
+
+      console.error(`Connection deferred, watching ${triggerDir} for ${triggerName}`)
+
+      // Check if trigger already exists (race condition)
+      if (fs.existsSync(triggerFile)) {
+        console.error('Trigger file already exists, connecting immediately...')
+        fs.unlinkSync(triggerFile)
+        this.connect({
+          host,
+          port: parseInt(process.env.MC_PORT) || 25565,
+          username,
+          version: process.env.MC_VERSION,
+          auth: process.env.MC_AUTH
+        }).then(() => {
+          console.error('Deferred connect successful')
+        }).catch(err => {
+          console.error(`Deferred connect failed: ${err.message}`)
+        })
+      } else {
+        // Watch for the file to be created
+        const watcher = fs.watch(triggerDir, (eventType, filename) => {
+          if (filename === triggerName && fs.existsSync(triggerFile)) {
+            console.error('Trigger file detected, connecting...')
+            watcher.close()
+            try {
+              fs.unlinkSync(triggerFile)
+            } catch (e) { /* ignore */ }
+            this.connect({
+              host,
+              port: parseInt(process.env.MC_PORT) || 25565,
+              username,
+              version: process.env.MC_VERSION,
+              auth: process.env.MC_AUTH
+            }).then(() => {
+              console.error('Deferred connect successful')
+            }).catch(err => {
+              console.error(`Deferred connect failed: ${err.message}`)
+            })
+          }
+        })
+      }
+    } else if (deferConnect) {
+      console.error('Connection deferred (MC_DEFER_CONNECT=1), waiting for explicit connect call')
     }
   }
 }
