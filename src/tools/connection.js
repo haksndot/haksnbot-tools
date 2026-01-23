@@ -139,10 +139,34 @@ export function registerMethods(mcp, mineflayer, minecraftData, pathfinder) {
         logBotMessage('chat', message, { user })
       })
 
+      // Track sign placement to filter subsequent sign content lines
+      let signPlacementTime = 0
+
       this.bot.on('message', (jsonMsg, position) => {
         if (position === 'system' || position === 'game_info') {
           const msgText = jsonMsg.toString()
           if (!msgText.trim()) return
+
+          // Filter out sign placement messages (private player activity)
+          // Format: "Username placed a sign @ world: x123, z456" or "Username places a sign @..."
+          if (/\bplaced? a sign @/.test(msgText)) {
+            signPlacementTime = Date.now()
+            return  // Don't log sign placement notifications
+          }
+
+          // Filter out sign content lines (short messages with leading whitespace)
+          // These come immediately after sign placement and contain the sign text
+          // Format: "  Line1" "  Line2" etc (2+ leading spaces, short content)
+          if (Date.now() - signPlacementTime < 500 && /^\s{2,}/.test(msgText) && msgText.length < 50) {
+            return  // Don't log sign content
+          }
+
+          // Filter out private messages/whispers - bot shouldn't see these between other players
+          // but if somehow received, don't forward them
+          // Format: "[Player -> Player]" or "Player whispers to you:" etc
+          if (/\s*->\s*/.test(msgText) || /whispers? to/i.test(msgText) || /\[.*\s*→\s*.*\]/.test(msgText)) {
+            return  // Don't log private messages
+          }
 
           // FreedomChat rewrites player chat as system messages
           // EssentialsXChat formats as "Username: message"
