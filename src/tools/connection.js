@@ -161,10 +161,12 @@ export function registerMethods(mcp, mineflayer, minecraftData, pathfinder) {
             return  // Don't log sign content
           }
 
-          // Filter out private messages/whispers - bot shouldn't see these between other players
-          // but if somehow received, don't forward them
-          // Format: "[Player -> Player]" or "Player whispers to you:" etc
-          if (/\s*->\s*/.test(msgText) || /whispers? to/i.test(msgText) || /\[.*\s*→\s*.*\]/.test(msgText)) {
+          // Filter out private messages/whispers - bot is op so it sees these
+          // Formats:
+          //   [[PlayerName]] message  - op view of private messages
+          //   [Player -> Player] message
+          //   Player whispers to you: message
+          if (/^\[\[[A-Za-z0-9_]+\]\]/.test(msgText) || /\s*->\s*/.test(msgText) || /whispers? to/i.test(msgText)) {
             return  // Don't log private messages
           }
 
