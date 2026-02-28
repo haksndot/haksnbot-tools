@@ -13,6 +13,7 @@
     "mineflayer": "^4.33.0",
     "mineflayer-pathfinder": "^2.4.0",
     "prismarine-auth": "^2.7.0",
-    "vec3": "^0.1.10"
+    "vec3": "^0.1.10",
+    "xvfb": "^0.4.0"
   }
 }
