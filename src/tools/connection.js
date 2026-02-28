@@ -2,6 +2,7 @@
  * Connection tools - connect, disconnect, get_connection_status
  */
 
+import path from 'path'
 import { text, json, logBotMessage } from '../utils/helpers.js'
 
 export const tools = [
@@ -83,6 +84,7 @@ export function registerMethods(mcp, mineflayer, minecraftData, pathfinder) {
       if (auth === 'microsoft') {
         opts.auth = 'microsoft'
         opts.authFlow = 'sisu'
+        opts.profilesFolder = process.env.MC_AUTH_CACHE || path.join(process.env.HOME, '.minecraft', 'nmp-cache')
         opts.onMsaCode = (data) => {
           msaCodeInfo = data
           console.error(`\nMicrosoft Login Required!\nGo to: ${data.verification_uri}\nEnter code: ${data.user_code}\n`)
