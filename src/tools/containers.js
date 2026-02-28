@@ -112,9 +112,20 @@ export function registerMethods(mcp, Vec3) {
 
   mcp.openContainer = async function({ x, y, z }) {
     this.requireBot()
-    const block = this.bot.blockAt(new Vec3(x, y, z))
+
+    // Ensure coordinates are integers - floats can cause blockAt to return invalid objects
+    const bx = Math.floor(x)
+    const by = Math.floor(y)
+    const bz = Math.floor(z)
+
+    const block = this.bot.blockAt(new Vec3(bx, by, bz))
     if (!block) {
-      return error(`No block found at ${x}, ${y}, ${z}`)
+      return error(`No block found at ${bx}, ${by}, ${bz}`)
+    }
+
+    // Verify the block object is valid for mineflayer's openContainer
+    if (!block.type && block.type !== 0) {
+      return error(`Invalid block object at ${bx}, ${by}, ${bz} - block.type is undefined. Block name: ${block.name}`)
     }
 
     // Check if it's a container block
@@ -128,7 +139,7 @@ export function registerMethods(mcp, Vec3) {
     // Also match colored shulker boxes
     const isContainer = containerBlocks.some(c => block.name.includes(c))
     if (!isContainer) {
-      return error(`Block "${block.name}" at ${x}, ${y}, ${z} is not a container`)
+      return error(`Block "${block.name}" at ${bx}, ${by}, ${bz} is not a container`)
     }
 
     try {
@@ -169,7 +180,7 @@ export function registerMethods(mcp, Vec3) {
       return json({
         container_type: layout.type,
         block_name: block.name,
-        position: { x, y, z },
+        position: { x: bx, y: by, z: bz },
         window_type: window.type,
         slot_layout: layout.slots,
         container_slot_count: layout.containerSlotCount || window.containerItems().length,
@@ -184,9 +195,9 @@ export function registerMethods(mcp, Vec3) {
 
         return json({
           error: 'container_access_denied',
-          message: `Cannot open container at ${x}, ${y}, ${z} - likely protected by a claim`,
+          message: `Cannot open container at ${bx}, ${by}, ${bz} - likely protected by a claim`,
           block_name: block.name,
-          position: { x, y, z },
+          position: { x: bx, y: by, z: bz },
           claim_info: claimInfo
         })
       }
