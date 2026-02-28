@@ -205,42 +205,42 @@ export function registerMethods(mcp) {
       return error(`Unknown item: ${item_name}`)
     }
 
-    const recipes = this.mcData.recipes[item.id]
+    // First check if a crafting table is nearby (for 3x3 recipes)
+    let craftingTable = this.findCraftingTable()
+
+    // Use bot.recipesFor() to get proper mineflayer Recipe objects
+    // This handles ingredient matching correctly
+    const recipes = this.bot.recipesFor(item.id, null, 1, craftingTable)
+
     if (!recipes || recipes.length === 0) {
-      return error(`No crafting recipe found for ${item_name}`)
-    }
-
-    // Find a usable recipe
-    let usableRecipe = null
-    let requiresTable = false
-
-    for (const recipe of recipes) {
-      const requires3x3 = recipe.inShape && (recipe.inShape.length > 2 ||
-        recipe.inShape.some(row => row && row.length > 2))
-
-      const maxCraftable = this.getMaxCraftable(recipe)
-      if (maxCraftable > 0) {
-        usableRecipe = recipe
-        requiresTable = requires3x3
-        break
+      // Try without crafting table to give a helpful message
+      const recipesWithoutTable = this.bot.recipesFor(item.id, null, 1, null)
+      if (recipesWithoutTable && recipesWithoutTable.length > 0) {
+        // Check if any recipe needs a crafting table (3x3)
+        const mcDataRecipes = this.mcData.recipes[item.id] || []
+        const needs3x3 = mcDataRecipes.some(r =>
+          r.inShape && (r.inShape.length > 2 || r.inShape.some(row => row && row.length > 2))
+        )
+        if (needs3x3 && !craftingTable) {
+          return error(`${item_name} requires a crafting table. None found within 4 blocks.`)
+        }
       }
-    }
 
-    if (!usableRecipe) {
-      return error(`Cannot craft ${item_name}: insufficient materials`)
-    }
-
-    // Find crafting table if needed
-    let craftingTable = null
-    if (requiresTable) {
-      craftingTable = this.findCraftingTable()
-      if (!craftingTable) {
-        return error(`${item_name} requires a crafting table. None found within 4 blocks.`)
+      // List what ingredients we have and what's needed
+      const inventory = this.bot.inventory.items()
+      const itemCounts = {}
+      for (const invItem of inventory) {
+        itemCounts[invItem.name] = (itemCounts[invItem.name] || 0) + invItem.count
       }
+
+      return error(`Cannot craft ${item_name}: insufficient materials. Inventory: ${JSON.stringify(itemCounts)}`)
     }
+
+    // Use the first available recipe
+    const recipe = recipes[0]
 
     try {
-      await this.bot.craft(usableRecipe, count, craftingTable)
+      await this.bot.craft(recipe, count, craftingTable)
       return text(`Crafted ${count}x ${item_name}`)
     } catch (err) {
       return error(`Failed to craft ${item_name}: ${err.message}`)
