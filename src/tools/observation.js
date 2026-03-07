@@ -1,13 +1,27 @@
 /**
- * Observation tools - get_status, get_block_at, scan_area, find_blocks, get_nearby_entities, get_nearby_players
+ * Observation tools - get_status, get_body_state, get_block_at, scan_area, find_blocks, get_nearby_entities, get_nearby_players
  */
 
 import { text, json, error } from '../utils/helpers.js'
+import { FOOD_ITEMS, ARMOR_SLOT_NAMES, ARMOR_TIERS } from '../reflexes.js'
+
+// Hostile mob types (used by get_body_state)
+const HOSTILE_MOBS = new Set([
+  'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider',
+  'enderman', 'witch', 'slime', 'phantom', 'drowned',
+  'husk', 'stray', 'pillager', 'vindicator', 'ravager',
+  'hoglin', 'piglin_brute', 'warden', 'breeze',
+])
 
 export const tools = [
   {
     name: 'get_status',
     description: 'Get bot status: position, health, food, gamemode, dimension',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'get_body_state',
+    description: 'Get comprehensive bot state for Body agent: position, health, food, hostiles, players, armor, food items, available armor, movement status, time of day, game mode. Designed for single round-trip per tick.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
@@ -63,7 +77,7 @@ export const tools = [
   },
   {
     name: 'get_nearby_players',
-    description: 'Get players within range',
+    description: 'Get players within range. Returns username, exact coordinates (x/y/z), distance, gamemode, and ping for each player.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -75,6 +89,7 @@ export const tools = [
 
 export function registerHandlers(mcp) {
   mcp.handlers['get_status'] = () => mcp.getStatus()
+  mcp.handlers['get_body_state'] = () => mcp.getBodyState()
   mcp.handlers['get_block_at'] = (args) => mcp.getBlockAt(args)
   mcp.handlers['scan_area'] = (args) => mcp.scanArea(args)
   mcp.handlers['find_blocks'] = (args) => mcp.findBlocks(args)
@@ -86,7 +101,8 @@ export function registerMethods(mcp, Vec3) {
   mcp.getStatus = function() {
     this.requireBot()
     const pos = this.bot.entity.position
-    return json({
+    const pf = this.bot.pathfinder
+    const status = {
       position: {
         x: Math.floor(pos.x),
         y: Math.floor(pos.y),
@@ -97,7 +113,96 @@ export function registerMethods(mcp, Vec3) {
       gameMode: this.bot.game.gameMode,
       dimension: this.bot.game.dimension,
       time: this.bot.time.day,
-      isRaining: this.bot.isRaining
+      isRaining: this.bot.isRaining,
+      isMoving: pf.isMoving(),
+      isMining: pf.isMining()
+    }
+    if (pf.goal) {
+      const g = pf.goal
+      status.pathGoal = {}
+      if (g.x !== undefined) status.pathGoal.x = g.x
+      if (g.y !== undefined) status.pathGoal.y = g.y
+      if (g.z !== undefined) status.pathGoal.z = g.z
+      if (g.rangeSq !== undefined) status.pathGoal.range = Math.round(Math.sqrt(g.rangeSq))
+    }
+    return json(status)
+  }
+
+  mcp.getBodyState = function() {
+    this.requireBot()
+    const bot = this.bot
+    const pos = bot.entity.position
+
+    // Nearby hostiles and players (within 24 blocks)
+    const hostiles = []
+    const players = []
+    for (const id in bot.entities) {
+      const e = bot.entities[id]
+      if (!e || e === bot.entity) continue
+      const dist = e.position.distanceTo(pos)
+      if (dist > 24) continue
+
+      if (e.type === 'hostile' || (e.name && HOSTILE_MOBS.has(e.name))) {
+        hostiles.push({
+          type: e.name,
+          distance: Math.round(dist),
+          x: Math.round(e.position.x),
+          y: Math.round(e.position.y),
+          z: Math.round(e.position.z)
+        })
+      } else if (e.type === 'player' && e.username !== bot.username) {
+        players.push({
+          name: e.username,
+          distance: Math.round(dist),
+          x: Math.round(e.position.x),
+          y: Math.round(e.position.y),
+          z: Math.round(e.position.z)
+        })
+      }
+    }
+
+    // Armor slots
+    const armor = {}
+    const armorSlots = bot.inventory.slots
+    const slotMap = { 5: 'head', 6: 'torso', 7: 'legs', 8: 'feet' }
+    for (const [slot, name] of Object.entries(slotMap)) {
+      const item = armorSlots[parseInt(slot)]
+      armor[name] = item ? item.name : null
+    }
+
+    // Available food in inventory
+    const foodItems = bot.inventory.items()
+      .filter(i => FOOD_ITEMS.includes(i.name))
+      .map(i => ({ name: i.name, count: i.count }))
+
+    // Available unequipped armor in inventory (better than current)
+    const availableArmor = []
+    for (const item of bot.inventory.items()) {
+      for (const [slot, suffixes] of Object.entries(ARMOR_SLOT_NAMES)) {
+        if (suffixes.some(s => item.name.endsWith(s)) && armor[slot] !== item.name) {
+          availableArmor.push({ name: item.name, slot, count: item.count })
+        }
+      }
+    }
+
+    // Pathfinder status
+    const pf = bot.pathfinder
+    const isMoving = pf?.isMoving() || false
+    const hasGoal = !!pf?.goal
+
+    return json({
+      position: { x: Math.round(pos.x), y: Math.round(pos.y), z: Math.round(pos.z) },
+      health: Math.round(bot.health),
+      food: Math.round(bot.food),
+      hostiles: hostiles.slice(0, 5),
+      players: players.slice(0, 5),
+      armor,
+      foodItems: foodItems.slice(0, 5),
+      availableArmor: availableArmor.slice(0, 5),
+      isMoving,
+      hasGoal,
+      timeOfDay: bot.time?.timeOfDay ?? 0,
+      gameMode: bot.game?.gameMode || 'unknown',
     })
   }
 
@@ -122,8 +227,11 @@ export function registerMethods(mcp, Vec3) {
     return json(result)
   }
 
-  mcp.scanArea = function({ x, y, z, radius = 16 }) {
+  mcp.scanArea = async function({ x, y, z, radius = 16 }) {
     this.requireBot()
+
+    // Cap radius to prevent event-loop stalls that cause keepalive timeouts
+    const cappedRadius = Math.min(radius, 16)
     const blocks = {}
 
     // Helper to get block key with properties
@@ -156,17 +264,27 @@ export function registerMethods(mcp, Vec3) {
     const queue = [botPos]
 
     // Define scan boundaries (cubic area around center)
-    const minX = x - radius, maxX = x + radius
-    const minY = y - radius, maxY = y + radius
-    const minZ = z - radius, maxZ = z + radius
+    const minX = x - cappedRadius, maxX = x + cappedRadius
+    const minY = y - cappedRadius, maxY = y + cappedRadius
+    const minZ = z - cappedRadius, maxZ = z + cappedRadius
 
     // BFS flood-fill through transparent blocks
+    // Yield to event loop periodically to allow keepalive responses
+    let iterations = 0
+    const YIELD_EVERY = 500
+
     while (queue.length > 0) {
       const pos = queue.shift()
       const key = `${pos.x},${pos.y},${pos.z}`
 
       if (visited.has(key)) continue
       visited.add(key)
+
+      iterations++
+      if (iterations % YIELD_EVERY === 0) {
+        // Yield to event loop so keepalive packets can be processed
+        await new Promise(resolve => setImmediate(resolve))
+      }
 
       const block = this.bot.blockAt(pos)
 
@@ -184,7 +302,7 @@ export function registerMethods(mcp, Vec3) {
           if (isTransparent(neighborBlock)) {
             // Continue flood-fill through transparent blocks
             // But only queue if within extended bounds (allow some exploration outside scan area)
-            const extendedRadius = radius + 10 // Allow pathfinding from nearby
+            const extendedRadius = cappedRadius + 10 // Allow pathfinding from nearby
             if (Math.abs(neighborPos.x - x) <= extendedRadius &&
                 Math.abs(neighborPos.y - y) <= extendedRadius &&
                 Math.abs(neighborPos.z - z) <= extendedRadius) {
@@ -215,7 +333,7 @@ export function registerMethods(mcp, Vec3) {
 
     return json({
       center: { x, y, z },
-      radius,
+      radius: cappedRadius,
       blocks
     })
   }

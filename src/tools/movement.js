@@ -1,5 +1,9 @@
 /**
  * Movement tools - move_to, move_near, follow_player, look_at, stop
+ *
+ * Both Mind and Body can call these. Body handles ambient movement;
+ * Mind calls them for intentional navigation. Body defers when Mind
+ * is actively directing movement (detected via narration tool_calls).
  */
 
 import { text, error } from '../utils/helpers.js'
@@ -7,59 +11,59 @@ import { text, error } from '../utils/helpers.js'
 export const tools = [
   {
     name: 'move_to',
-    description: 'Pathfind and move to coordinates',
+    description: 'Move the bot to exact coordinates using pathfinding. Non-blocking.',
     inputSchema: {
       type: 'object',
       properties: {
-        x: { type: 'number', description: 'Target X' },
-        y: { type: 'number', description: 'Target Y' },
-        z: { type: 'number', description: 'Target Z' }
+        x: { type: 'number', description: 'X coordinate' },
+        y: { type: 'number', description: 'Y coordinate' },
+        z: { type: 'number', description: 'Z coordinate' }
       },
       required: ['x', 'y', 'z']
     }
   },
   {
     name: 'move_near',
-    description: 'Pathfind to within range of coordinates',
+    description: 'Move within range of coordinates using pathfinding. Non-blocking.',
     inputSchema: {
       type: 'object',
       properties: {
-        x: { type: 'number', description: 'Target X' },
-        y: { type: 'number', description: 'Target Y' },
-        z: { type: 'number', description: 'Target Z' },
-        range: { type: 'number', description: 'Stop within this distance', default: 2 }
+        x: { type: 'number', description: 'X coordinate' },
+        y: { type: 'number', description: 'Y coordinate' },
+        z: { type: 'number', description: 'Z coordinate' },
+        range: { type: 'number', description: 'How close to get (default 2)', default: 2 }
       },
       required: ['x', 'y', 'z']
     }
   },
   {
     name: 'follow_player',
-    description: 'Follow a player by username',
+    description: 'Follow a player at a set distance. Non-blocking.',
     inputSchema: {
       type: 'object',
       properties: {
-        username: { type: 'string', description: 'Player username to follow' },
-        distance: { type: 'number', description: 'Follow distance', default: 3 }
+        username: { type: 'string', description: 'Player username' },
+        distance: { type: 'number', description: 'Follow distance (default 3)', default: 3 }
       },
       required: ['username']
     }
   },
   {
     name: 'look_at',
-    description: 'Turn to look at coordinates',
+    description: 'Make the bot look at specific coordinates.',
     inputSchema: {
       type: 'object',
       properties: {
-        x: { type: 'number', description: 'Target X' },
-        y: { type: 'number', description: 'Target Y' },
-        z: { type: 'number', description: 'Target Z' }
+        x: { type: 'number', description: 'X coordinate' },
+        y: { type: 'number', description: 'Y coordinate' },
+        z: { type: 'number', description: 'Z coordinate' }
       },
       required: ['x', 'y', 'z']
     }
   },
   {
     name: 'stop',
-    description: 'Stop current movement/pathfinding',
+    description: 'Stop all movement and pathfinding.',
     inputSchema: { type: 'object', properties: {} }
   }
 ]
@@ -67,8 +71,8 @@ export const tools = [
 export function registerHandlers(mcp) {
   mcp.handlers['move_to'] = (args) => mcp.moveTo(args)
   mcp.handlers['move_near'] = (args) => mcp.moveNear(args)
-  mcp.handlers['follow_player'] = async (args) => mcp.followPlayer(args)
-  mcp.handlers['look_at'] = async (args) => mcp.lookAt(args)
+  mcp.handlers['follow_player'] = (args) => mcp.followPlayer(args)
+  mcp.handlers['look_at'] = (args) => mcp.lookAt(args)
   mcp.handlers['stop'] = () => mcp.stop()
 }
 
@@ -85,6 +89,8 @@ export function registerMethods(mcp, Vec3, Movements, goals) {
     this.bot.pathfinder.setGoal(goal)
 
     const pos = this.bot.entity.position
+    const isMoving = this.bot.pathfinder.isMoving()
+    console.error(`[moveTo] goal set to ${x},${y},${z} from ${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}, isMoving=${isMoving}, hasGoal=${!!this.bot.pathfinder.goal}`)
     return text(`Moving from ${Math.floor(pos.x)}, ${Math.floor(pos.y)}, ${Math.floor(pos.z)} to ${x}, ${y}, ${z}. Use get_status to check progress or stop to cancel.`)
   }
 

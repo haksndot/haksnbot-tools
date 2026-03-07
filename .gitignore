@@ -1,1 +1,6 @@
 node_modules/
+cache/
+libraries/
+versions/
+haksnbot-cam/
+src/tools/viewer.js

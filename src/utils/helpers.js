@@ -6,7 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// Get absolute path to repo root (minecraft-mcp is a sibling of agent)
+// Get absolute path to repo root (tools is a sibling of agent)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 
@@ -28,11 +28,9 @@ try {
 export function logBotMessage(type, content, extra = {}) {
   const timestamp = new Date().toISOString()
   const logLine = JSON.stringify({ timestamp, type, content, ...extra }) + '\n'
-  try {
-    fs.appendFileSync(BOT_MESSAGE_LOG, logLine)
-  } catch (e) {
-    console.error('Failed to write bot message log:', e.message)
-  }
+  fs.appendFile(BOT_MESSAGE_LOG, logLine, (err) => {
+    if (err) console.error('Failed to write bot message log:', err.message)
+  })
 }
 
 // Helper for consistent text responses

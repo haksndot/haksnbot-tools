@@ -1,5 +1,8 @@
 /**
  * Combat tools - attack_entity, use_item
+ *
+ * attack_entity re-enabled as MCP tool for Body agent access.
+ * Mind's allowed_tools in core.py continues to exclude it.
  */
 
 import { text, error } from '../utils/helpers.js'
@@ -8,11 +11,12 @@ import { matchesEntityType } from '../utils/helpers.js'
 export const tools = [
   {
     name: 'attack_entity',
-    description: 'Attack the nearest entity of a type',
+    description: 'Attack the nearest entity of a given type',
     inputSchema: {
       type: 'object',
       properties: {
-        entity_type: { type: 'string', description: 'Entity type to attack (e.g. zombie, skeleton)' }
+        entity_type: { type: 'string', description: 'Entity type to attack (cow, sheep, pig, horse, villager, etc.)' },
+        max_distance: { type: 'number', description: 'Max search distance', default: 32 }
       },
       required: ['entity_type']
     }
@@ -25,7 +29,7 @@ export const tools = [
 ]
 
 export function registerHandlers(mcp) {
-  mcp.handlers['attack_entity'] = async (args) => mcp.attackEntity(args)
+  mcp.handlers['attack_entity'] = (args) => mcp.attackEntity(args)
   mcp.handlers['use_item'] = async () => mcp.useItem()
 }
 

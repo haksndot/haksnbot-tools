@@ -17,12 +17,12 @@ export const tools = [
   },
   {
     name: 'equip_item',
-    description: 'Equip an item by name to hand or armor slot',
+    description: 'Equip an item by name to hand or off-hand only. Body manages armor slots automatically.',
     inputSchema: {
       type: 'object',
       properties: {
         item_name: { type: 'string', description: 'Item name to equip' },
-        destination: { type: 'string', description: 'hand, off-hand, head, torso, legs, feet', default: 'hand' }
+        destination: { type: 'string', description: 'hand or off-hand (armor slots managed by Body)', default: 'hand' }
       },
       required: ['item_name']
     }
@@ -63,6 +63,12 @@ export function registerMethods(mcp) {
 
   mcp.equipItem = async function({ item_name, destination = 'hand' }) {
     this.requireBot()
+
+    // Body manages armor — Mind can only equip to hand/off-hand
+    if (destination !== 'hand' && destination !== 'off-hand') {
+      return error(`Cannot equip to ${destination} — Body manages armor automatically. Use "hand" or "off-hand".`)
+    }
+
     const item = this.bot.inventory.items().find(i => i.name === item_name)
     if (!item) {
       return error(`Item "${item_name}" not in inventory`)
