@@ -43,51 +43,76 @@ export function registerHandlers(mcp) {
 }
 
 export function registerMethods(mcp, Vec3) {
-  // Helper to find the best tool for breaking a block
+  // Helper to find the best tool for breaking a block.
+  // Uses minecraft-data material/harvestTools fields instead of hardcoded patterns.
   mcp.findBestTool = function(block) {
     const items = this.bot.inventory.items()
     if (items.length === 0) return null
 
-    // Tool effectiveness mapping
-    const toolTypes = {
-      pickaxe: ['stone', 'cobblestone', 'ore', 'iron_block', 'gold_block', 'diamond_block', 'netherite_block', 'obsidian', 'brick', 'concrete', 'terracotta', 'prismarine', 'purpur', 'quartz', 'sandstone', 'end_stone', 'basalt', 'blackstone', 'deepslate', 'copper', 'amethyst', 'calcite', 'dripstone', 'pointed_dripstone', 'ice', 'packed_ice', 'blue_ice', 'lantern', 'chain', 'iron_bars', 'iron_door', 'iron_trapdoor', 'anvil', 'enchanting_table', 'ender_chest', 'furnace', 'blast_furnace', 'smoker', 'stonecutter', 'grindstone', 'lodestone', 'hopper', 'cauldron', 'brewing_stand', 'bell', 'conduit', 'spawner', 'nether_brick', 'rail', 'powered_rail', 'detector_rail', 'activator_rail'],
-      axe: ['wood', 'log', 'planks', 'fence', 'door', 'sign', 'chest', 'barrel', 'crafting_table', 'bookshelf', 'lectern', 'composter', 'ladder', 'scaffolding', 'campfire', 'beehive', 'bee_nest', 'bamboo', 'pumpkin', 'melon', 'jack_o_lantern', 'mushroom_block', 'cocoa', 'jukebox', 'note_block', 'banner', 'loom', 'cartography_table', 'fletching_table', 'smithing_table', 'bed'],
-      shovel: ['dirt', 'grass', 'sand', 'gravel', 'clay', 'soul_sand', 'soul_soil', 'mycelium', 'podzol', 'farmland', 'coarse_dirt', 'rooted_dirt', 'mud', 'snow', 'snow_block', 'powder_snow', 'concrete_powder'],
-      hoe: ['hay_block', 'target', 'dried_kelp_block', 'sponge', 'wet_sponge', 'leaves', 'sculk', 'sculk_catalyst', 'sculk_sensor', 'sculk_shrieker', 'sculk_vein', 'moss_block', 'moss_carpet', 'nether_wart_block', 'warped_wart_block', 'shroomlight'],
-      shears: ['wool', 'cobweb', 'leaves', 'vine', 'glow_lichen']
-    }
+    const material = block.material || ''
 
-    // Find which tool type is best for this block
+    // Determine preferred tool type from the block's material field
     let bestToolType = null
-    for (const [toolType, blockPatterns] of Object.entries(toolTypes)) {
-      if (blockPatterns.some(pattern => block.name.includes(pattern))) {
-        bestToolType = toolType
-        break
-      }
+    if (material.includes('mineable/pickaxe') || material === 'incorrect_for_wooden_tool') {
+      bestToolType = 'pickaxe'
+    } else if (material.includes('mineable/axe') || material.includes('gourd')) {
+      bestToolType = 'axe'
+    } else if (material.includes('mineable/shovel')) {
+      bestToolType = 'shovel'
+    } else if (material.includes('mineable/hoe')) {
+      bestToolType = 'hoe'
+    } else if (material === 'wool' || material === 'coweb' || material.includes('vine_or_glow_lichen')) {
+      bestToolType = 'shears'
     }
 
     if (!bestToolType) return null
 
+    // For shears, just find shears in inventory
+    if (bestToolType === 'shears') {
+      return items.find(i => i.name === 'shears') || null
+    }
+
     // Tool material ranking (best to worst)
     const materialRank = ['netherite', 'diamond', 'iron', 'golden', 'stone', 'wooden']
 
-    // Find best tool of the right type
+    // harvestTools maps item IDs that can actually harvest (get drops from) this block.
+    // If present, prefer tools in the list. Fall back to any matching tool type.
+    const harvestTools = block.harvestTools
+
     let bestTool = null
     let bestRank = Infinity
+    let bestFallback = null
+    let bestFallbackRank = Infinity
 
     for (const item of items) {
       if (!item.name.includes(bestToolType)) continue
 
+      let rank = Infinity
       for (let i = 0; i < materialRank.length; i++) {
-        if (item.name.includes(materialRank[i]) && i < bestRank) {
-          bestRank = i
-          bestTool = item
+        if (item.name.includes(materialRank[i])) {
+          rank = i
           break
+        }
+      }
+      if (rank >= bestFallbackRank) continue
+
+      if (harvestTools && !harvestTools[item.type]) {
+        // Tool can break faster but won't harvest — track as fallback
+        if (rank < bestFallbackRank) {
+          bestFallbackRank = rank
+          bestFallback = item
+        }
+      } else {
+        // Tool can harvest (or block has no tier requirement)
+        if (rank < bestRank) {
+          bestRank = rank
+          bestTool = item
         }
       }
     }
 
-    return bestTool
+    // Prefer a tool that can harvest; fall back to one that at least breaks faster
+    return bestTool || bestFallback
   }
 
   mcp.placeBlock = async function({ block_name, x, y, z, face = 'auto' }) {

@@ -143,14 +143,29 @@ export function registerMethods(mcp, Vec3) {
     }
 
     try {
-      // Open the container with a timeout - claimed chests will hang
-      const openTimeout = 5000 // 5 seconds
+      // Track whether the server opened the window (open_window packet received)
+      // vs never responding at all (claim denial). This distinguishes:
+      //   1. Claim denial: server ignores the activate_block, no packets sent
+      //   2. Parser failure: server sends open_window + window_items, but
+      //      prismarine-item can't deserialize items (e.g. shulker boxes with
+      //      nested item components in MC 1.21+), so mineflayer's windowOpen
+      //      event never fires even though the window is open server-side.
+      let serverOpenedWindow = false
+      const onOpenWindow = () => { serverOpenedWindow = true }
+      this.bot._client.on('open_window', onOpenWindow)
+
+      const openTimeout = 5000
       const openPromise = this.bot.openContainer(block)
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT')), openTimeout)
       )
 
-      const window = await Promise.race([openPromise, timeoutPromise])
+      let window
+      try {
+        window = await Promise.race([openPromise, timeoutPromise])
+      } finally {
+        this.bot._client.removeListener('open_window', onOpenWindow)
+      }
 
       // Get layout info
       const layout = this.getContainerSlotLayout(window.type)
@@ -188,11 +203,23 @@ export function registerMethods(mcp, Vec3) {
         inventory: inventoryItems
       })
     } catch (err) {
-      // If timeout or other failure, check if it's a claimed container
       if (err.message === 'TIMEOUT' || err.message.includes('timeout')) {
-        // Check claim status
-        const claimInfo = await checkClaimStatus(this.bot)
+        if (serverOpenedWindow) {
+          // Server opened the window but mineflayer couldn't parse window_items.
+          // This happens when the container holds items with complex NBT data
+          // (e.g. shulker boxes with nested item components in MC 1.21+).
+          // Close the server-side window to avoid desync.
+          try { this.bot._client.write('close_window', { windowId: 0 }) } catch (_) {}
+          return json({
+            error: 'container_parse_failure',
+            message: `Container at ${bx}, ${by}, ${bz} opened server-side but item data could not be parsed. This is a known issue with containers holding shulker boxes or items with complex NBT data (MC 1.21+ protocol). The container cannot be read or modified by the bot.`,
+            block_name: block.name,
+            position: { x: bx, y: by, z: bz }
+          })
+        }
 
+        // Server never responded — likely a claim denial
+        const claimInfo = await checkClaimStatus(this.bot)
         return json({
           error: 'container_access_denied',
           message: `Cannot open container at ${bx}, ${by}, ${bz} - likely protected by a claim`,
