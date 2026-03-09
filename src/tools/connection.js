@@ -4,6 +4,7 @@
 
 import path from 'path'
 import { text, json, logBotMessage } from '../utils/helpers.js'
+import { installRawPacketInterceptor } from '../utils/lenient-parser.js'
 
 export const tools = [
   {
@@ -102,6 +103,10 @@ export function registerMethods(mcp, mineflayer, minecraftData, pathfinder) {
         this.bot._client.on('keep_alive', (packet) => {
           this.lastKeepalive = Date.now()
         })
+        // Install raw packet interceptor for lenient window_items parsing.
+        // Must be after login because compression is set up during handshake.
+        const loginMcData = minecraftData(this.bot.version)
+        installRawPacketInterceptor(this.bot, loginMcData)
       })
 
       // Success: bot spawned
