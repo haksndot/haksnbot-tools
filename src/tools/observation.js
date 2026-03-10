@@ -3,15 +3,7 @@
  */
 
 import { text, json, error } from '../utils/helpers.js'
-import { FOOD_ITEMS, ARMOR_SLOT_NAMES, ARMOR_TIERS } from '../reflexes.js'
-
-// Hostile mob types (used by get_body_state)
-const HOSTILE_MOBS = new Set([
-  'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider',
-  'enderman', 'witch', 'slime', 'phantom', 'drowned',
-  'husk', 'stray', 'pillager', 'vindicator', 'ravager',
-  'hoglin', 'piglin_brute', 'warden', 'breeze',
-])
+import { FOOD_ITEMS, ARMOR_SLOT_NAMES, ARMOR_TIERS, HOSTILE_MOBS } from 'haksnbot-guts'
 
 export const tools = [
   {

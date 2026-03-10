@@ -2,7 +2,7 @@
 
 An MCP (Model Context Protocol) server that gives Claude the ability to play Minecraft. Built on [Mineflayer](https://github.com/PrismarineJS/mineflayer), this tool lets Claude Code (or any MCP-compatible AI) control a Minecraft bot with 40+ actions.
 
-> **Part of the Haksnbot suite:** This project was originally developed as part of [Haksnbot](https://github.com/haksndot), an autonomous Minecraft bot. The suite includes four repos that work together: [haksnbot-tools](https://github.com/haksndot/haksnbot-tools) (this repo - Minecraft bot control), [haksnbot-agent](https://github.com/haksndot/haksnbot-agent) (the autonomous agent), [haksnbot-admin](https://github.com/haksndot/haksnbot-admin) (server administration), and [haksnbot-memory](https://github.com/haksndot/haksnbot-memory) (persistent memory). Each can be used independently, but they're designed to work together.
+> **Part of the Haksnbot suite:** This project was originally developed as part of [Haksnbot](https://github.com/haksndot), an autonomous Minecraft bot. The suite includes four repos that work together: [haksnbot-tools](https://github.com/haksndot/haksnbot-tools) (this repo - Minecraft bot control), [haksnbot-mind](https://github.com/haksndot/haksnbot-mind) (the autonomous agent), [haksnbot-admin](https://github.com/haksndot/haksnbot-admin) (server administration), and [haksnbot-memory](https://github.com/haksndot/haksnbot-memory) (persistent memory). Each can be used independently, but they're designed to work together.
 
 ## Features
 
@@ -260,7 +260,7 @@ For servers with QuickShop-Hikari, the bot can query and interact with player sh
 
 ## Related Projects
 
-- [haksnbot-agent](https://github.com/haksndot/haksnbot-agent) - Autonomous Minecraft bot using Claude Agent SDK
+- [haksnbot-mind](https://github.com/haksndot/haksnbot-mind) - Autonomous Minecraft bot using Claude Agent SDK
 - [haksnbot-admin](https://github.com/haksndot/haksnbot-admin) - Server administration MCP tools
 
 ## License

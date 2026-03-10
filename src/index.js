@@ -28,8 +28,8 @@ const { pathfinder, Movements, goals } = pathfinderPkg
 import Vec3Pkg from 'vec3'
 const Vec3 = Vec3Pkg.Vec3 || Vec3Pkg
 
-// Import Reflexes (survival actions for connection daemon)
-import { Reflexes } from './reflexes.js'
+// Import Guts (survival instincts for connection daemon)
+import { Guts } from 'haksnbot-guts'
 
 // Import tool modules
 import * as connectionTools from './tools/connection.js'
@@ -110,7 +110,7 @@ class MinecraftMCP {
     this.currentVillager = null
     this.xvfb = null
     this.physicalLock = null  // Name of tool holding the physical lock, or null
-    this.reflexes = null
+    this.guts = null
 
     // In HTTP mode, we create a new Server per session (each client gets its own).
     // In stdio mode, we use a single server instance like before.
@@ -189,9 +189,9 @@ class MinecraftMCP {
   }
 
   onBotReady() {
-    // Start reflexes (eat, armor) in the connection daemon
-    if (this.reflexes) {
-      this.reflexes.start()
+    // Start guts (eat, armor, combat, flee) in the connection daemon
+    if (this.guts) {
+      this.guts.start()
     }
   }
 
@@ -209,8 +209,17 @@ class MinecraftMCP {
     // Register methods from all modules
     this._registerMethods()
 
-    // Create Reflexes instance (starts when bot connects via onBotReady)
-    this.reflexes = new Reflexes(this)
+    // Create Guts instance (starts when bot connects via onBotReady)
+    this.guts = new Guts({
+      getBot: () => this.bot,
+      isLocked: () => !!this.physicalLock,
+      onFlee: (x, y, z) => {
+        if (this.bot?.pathfinder) {
+          const { GoalBlock } = pathfinderPkg.goals
+          this.bot.pathfinder.setGoal(new GoalBlock(x, y, z))
+        }
+      },
+    })
 
     const server = this._createServer()
     const transport = new StdioServerTransport()
@@ -225,8 +234,17 @@ class MinecraftMCP {
     // Register methods from all modules
     this._registerMethods()
 
-    // Create Reflexes instance
-    this.reflexes = new Reflexes(this)
+    // Create Guts instance
+    this.guts = new Guts({
+      getBot: () => this.bot,
+      isLocked: () => !!this.physicalLock,
+      onFlee: (x, y, z) => {
+        if (this.bot?.pathfinder) {
+          const { GoalBlock } = pathfinderPkg.goals
+          this.bot.pathfinder.setGoal(new GoalBlock(x, y, z))
+        }
+      },
+    })
 
     // Map to store transports by session ID
     const transports = {}
@@ -388,7 +406,7 @@ process.on('SIGTERM', () => {
   console.error('[haksnbot-tools] SIGTERM received')
   if (mcp.watchdogTimer) clearInterval(mcp.watchdogTimer)
   if (mcp.reconnectTimer) clearTimeout(mcp.reconnectTimer)
-  if (mcp.reflexes) mcp.reflexes.stop()
+  if (mcp.guts) mcp.guts.stop()
   process.exit(0)
 })
 
@@ -396,6 +414,6 @@ process.on('SIGINT', () => {
   console.error('[haksnbot-tools] SIGINT received')
   if (mcp.watchdogTimer) clearInterval(mcp.watchdogTimer)
   if (mcp.reconnectTimer) clearTimeout(mcp.reconnectTimer)
-  if (mcp.reflexes) mcp.reflexes.stop()
+  if (mcp.guts) mcp.guts.stop()
   process.exit(0)
 })
